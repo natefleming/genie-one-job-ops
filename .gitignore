@@ -1,0 +1,17 @@
+.databricks/
+__pycache__/
+*.pyc
+node_modules/
+presentation/node_modules/
+app/frontend/node_modules/
+.venv/
+build/
+
+# Customer identifiers, customer material and local tool state: kept on this machine only
+*.local.yml
+docs/private/
+PRODUCT.md
+presentation/
+app/static/presentation/
+.isaac/
+.impeccable/

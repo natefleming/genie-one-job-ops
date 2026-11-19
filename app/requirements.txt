@@ -1,0 +1,6 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+databricks-sdk>=0.124.0
+databricks-agentbricks==0.10.0
+mlflow-skinny>=3.18
+loguru>=0.7

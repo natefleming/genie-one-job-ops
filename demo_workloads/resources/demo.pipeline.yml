@@ -1,0 +1,11 @@
+resources:
+  pipelines:
+    customer_orders:
+      name: "${var.job_prefix} Customer Orders Pipeline"
+      catalog: ${var.catalog}
+      schema: ${var.schema}
+      serverless: true
+      configuration:
+        source_table: ${var.catalog}.${var.schema}.orders_source
+      libraries:
+        - file: {path: ../src/orders_pipeline.py}

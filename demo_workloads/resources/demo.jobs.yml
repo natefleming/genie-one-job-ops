@@ -1,0 +1,92 @@
+resources:
+  jobs:
+    demo_setup:
+      name: "[${var.job_prefix} demo] 0 · setup demo data"
+      tasks:
+        - task_key: setup
+          notebook_task:
+            notebook_path: ../src/00_setup_demo_data.py
+            base_parameters: {catalog: "${var.catalog}", schema: "${var.schema}"}
+
+    nightly_sales:
+      name: "${var.job_prefix} Nightly Sales Load"
+      description: Loads point-of-sale transactions from stores, builds regional sales reporting.
+      tags: {source_system: store_pos, team: sales_analytics}
+      schedule: {quartz_cron_expression: "0 0 6 * * ?", timezone_id: America/Chicago, pause_status: "${var.schedule_pause}"}
+      tasks:
+        - task_key: ingest_pos
+          notebook_task:
+            notebook_path: ../src/ingest_pos.py
+            base_parameters: {catalog: "${var.catalog}", schema: "${var.schema}"}
+        - task_key: build_silver_sales
+          depends_on: [{task_key: ingest_pos}]
+          notebook_task:
+            notebook_path: ../src/build_silver_sales.py
+            base_parameters: {catalog: "${var.catalog}", schema: "${var.schema}"}
+        - task_key: refresh_regions
+          depends_on: [{task_key: build_silver_sales}]
+          for_each_task:
+            inputs: '["northeast", "southeast", "central", "west"]'
+            task:
+              task_key: refresh_region
+              notebook_task:
+                notebook_path: ../src/refresh_region.py
+                base_parameters: {catalog: "${var.catalog}", schema: "${var.schema}", region: "{{input}}"}
+        - task_key: publish_gold_sales
+          depends_on: [{task_key: refresh_regions}]
+          notebook_task:
+            notebook_path: ../src/publish_gold_sales.py
+            base_parameters: {catalog: "${var.catalog}", schema: "${var.schema}"}
+
+    exec_sales_report:
+      name: "${var.job_prefix} Exec Sales Report"
+      description: Builds the leadership regional-sales report from the gold sales summary.
+      tags: {team: finance_reporting}
+      schedule: {quartz_cron_expression: "0 0 7 * * ?", timezone_id: America/Chicago, pause_status: "${var.schedule_pause}"}
+      tasks:
+        - task_key: build_report
+          notebook_task:
+            notebook_path: ../src/exec_sales_report.py
+            base_parameters: {catalog: "${var.catalog}", schema: "${var.schema}"}
+
+    inventory_sync:
+      name: "${var.job_prefix} Inventory Sync (MuleSoft feed)"
+      description: Loads the store inventory file MuleSoft drops into the landing volume every night.
+      tags: {source_system: mulesoft, mulesoft_flow: inventory-sync-to-lakehouse, team: supply_chain}
+      schedule: {quartz_cron_expression: "0 30 2 * * ?", timezone_id: America/Chicago, pause_status: "${var.schedule_pause}"}
+      tasks:
+        - task_key: load_inventory_feed
+          notebook_task:
+            notebook_path: ../src/inventory_sync.py
+            base_parameters: {catalog: "${var.catalog}", schema: "${var.schema}"}
+
+    web_events:
+      name: "${var.job_prefix} Web Events Ingest (BigQuery)"
+      description: Hourly copy of the website's web events from BigQuery.
+      tags: {source_system: gcp_bigquery, team: digital}
+      schedule: {quartz_cron_expression: "0 0 * * * ?", timezone_id: America/Chicago, pause_status: "${var.schedule_pause}"}
+      tasks:
+        - task_key: ingest_web_events
+          notebook_task:
+            notebook_path: ../src/web_events_ingest.py
+            base_parameters: {catalog: "${var.catalog}", schema: "${var.schema}"}
+
+    customer_orders_refresh:
+      name: "${var.job_prefix} Customer Orders Refresh"
+      tags: {source_system: oms, team: ecommerce}
+      tasks:
+        - task_key: refresh_orders_pipeline
+          pipeline_task: {pipeline_id: "${resources.pipelines.customer_orders.id}"}
+
+    chaos:
+      name: "[${var.job_prefix} demo] chaos · break or heal the demo"
+      description: >-
+        scenario=break turns on the failure flags and kicks off the demo jobs; scenario=heal turns them
+        off and re-runs everything so it recovers (gives Genie a time-to-recover to report).
+      parameters:
+        - {name: scenario, default: break}
+      tasks:
+        - task_key: chaos
+          notebook_task:
+            notebook_path: ../src/chaos.py
+            base_parameters: {catalog: "${var.catalog}", schema: "${var.schema}", job_prefix: "${var.job_prefix}"}

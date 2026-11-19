@@ -1,0 +1,80 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/databricks/cli/main/bundle/schema/jsonschema.json
+# Genie One Job Ops (monitor & resolve failed jobs/pipelines)
+#
+# One generic target. Pick the workspace at deploy time with --profile and override
+# anything that differs with --var. Example (FEVM testbed):
+#   databricks bundle deploy --profile fevm
+# Customer workspace example:
+#   databricks bundle deploy --profile customer --var catalog=<their catalog>
+# Or use the wrapper: ./scripts/deploy.sh <profile> <catalog> [--with-demo]
+bundle:
+  name: genie-one-job-ops
+  engine: direct
+
+include:
+  - resources/*.yml
+  - "*.local.yml"
+
+sync:
+  exclude:
+    - "presentation/review/**"
+    - "**/node_modules/**"
+    - "**/*.pdf"
+    - "app/frontend/**"
+  include:
+    - "app/static/**"
+
+variables:
+  catalog:
+    description: Unity Catalog catalog that holds the job-ops schema (metric views, functions, skills).
+    default: retail_consumer_goods
+  schema:
+    description: Schema for metric views, functions, UC Skills and MCP services.
+    default: job_ops
+  company_name:
+    description: Company name shown in the app and used in the Genie Agent's instructions.
+    default: Acme
+  warehouse_id:
+    description: SQL warehouse used by the setup job, the Genie Agent and the Ops app.
+    lookup:
+      warehouse: Serverless Starter Warehouse
+  refresh_schedule:
+    description: UNPAUSED runs the 15-minute snapshot refresh; PAUSED stops it.
+    default: UNPAUSED
+  ops_group:
+    description: Group that gets read access to the metric views, skills and MCP services.
+    default: account users
+  ops_app_name:
+    description: Databricks App name for the Job Ops web app.
+    default: job-ops
+  mcp_app_name:
+    description: Databricks App name for the mock integrations MCP server (MuleSoft + GCP placeholder).
+    default: mcp-job-ops-integrations
+  zeroops_url:
+    description: >-
+      Where "Open in ZeroOps" points. ZeroOps has no per-incident API yet, so this is the
+      Jobs & Pipelines page, where the ZeroOps inbox banner appears once the workspace is enrolled.
+      Use {host} and {workspace_id} placeholders.
+    default: "{host}/jobs?o={workspace_id}"
+  mulesoft_mcp_url:
+    description: Real MuleSoft MCP server URL. Empty = use the mock MCP app.
+    default: ""
+  gcp_mcp_url:
+    description: Real GCP MCP server URL (open question with the customer). Empty = use the mock MCP app.
+    default: ""
+  demo_flags_table:
+    description: Demo failure-flags table read by the mock MCP so its story follows the demo (set by deploy.sh --with-demo).
+    default: ""
+  domain_tag_key:
+    description: Governed tag key backing the Genie One domain.
+    default: "Data Platform Operations"
+  schema_only_scope:
+    description: >-
+      true = create nothing outside catalog.schema: never create the schema, no catalog grant, no Genie One domain,
+      no workspace instructions. Used in customer workspaces where we only own one schema.
+    default: "false"
+
+targets:
+  default:
+    default: true
+  # Customer workspace targets live in targets.local.yml (gitignored); see targets.local.yml.example.

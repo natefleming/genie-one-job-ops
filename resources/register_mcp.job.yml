@@ -1,0 +1,20 @@
+# Default target only: needs CREATE CONNECTION on the metastore, which a schema-scoped
+# customer deploy (see targets.local.yml.example) doesn't have.
+targets:
+  default:
+    resources:
+      jobs:
+        job_ops_register_mcp:
+          name: "[Job Ops] register MCP services — MuleSoft, GCP, job errors"
+          description: Registers the integrations MCP app as Unity Catalog MCP services for Genie One. Run after the app is started.
+          tasks:
+            - task_key: register
+              notebook_task:
+                notebook_path: ../src/notebooks/register_mcp_services.py
+                base_parameters:
+                  catalog: ${var.catalog}
+                  schema: ${var.schema}
+                  app_name: ${var.mcp_app_name}
+                  ops_app_name: ${var.ops_app_name}
+                  ops_group: ${var.ops_group}
+                  demo_flags_table: ${var.demo_flags_table}

@@ -1,0 +1,52 @@
+resources:
+  apps:
+    job_ops_app:
+      name: ${var.ops_app_name}
+      description: "Job Ops — what broke, why, who is affected, and how to fix it"
+      source_code_path: ../app
+      user_api_scopes: [sql, genie]
+      # App telemetry (Beta): the app's stdout/stderr logs (and any OTel metrics/spans) land in these UC tables.
+      telemetry_export_destinations:
+        - unity_catalog:
+            logs_table: ${var.catalog}.${var.schema}.job_ops_app_otel_logs
+            metrics_table: ${var.catalog}.${var.schema}.job_ops_app_otel_metrics
+            traces_table: ${var.catalog}.${var.schema}.job_ops_app_otel_spans
+      config:
+        command: ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "$DATABRICKS_APP_PORT"]
+        env:
+          - {name: WAREHOUSE_ID, value: "${var.warehouse_id}"}
+          - {name: JOB_OPS_SCHEMA, value: "${var.catalog}.${var.schema}"}
+          - {name: ZEROOPS_URL, value: "${var.zeroops_url}"}
+          - {name: GENIE_AGENT_TITLE, value: "Job Ops"}
+          - {name: COMPANY_NAME, value: "${var.company_name}"}
+          - {name: GENIE_ENGINE, value: "one"}   # "agent" = skip Genie One, use the Job Ops agent only
+          - {name: LOG_LEVEL, value: "INFO"}
+          # MLflow traces (databricks-agentbricks configure_tracing): one trace per Genie turn, stored in the UC
+          # tables the setup job's `tracing` task links to this experiment. Don't set MLFLOW_TRACING_DESTINATION.
+          - {name: MLFLOW_TRACKING_URI, value: "databricks"}
+          - {name: MLFLOW_EXPERIMENT_ID, value_from: experiment}
+          - {name: MLFLOW_TRACING_SQL_WAREHOUSE_ID, value: "${var.warehouse_id}"}
+      resources:
+        - name: sql-warehouse
+          sql_warehouse: {id: "${var.warehouse_id}", permission: CAN_USE}
+        - name: experiment
+          experiment: {experiment_id: "${resources.experiments.job_ops_traces.id}", permission: CAN_EDIT}
+
+# Default target only: the mock MCP app is only used through MCP registration, which needs CREATE CONNECTION
+# on the metastore — a schema-scoped customer deploy (see targets.local.yml.example) doesn't have it.
+targets:
+  default:
+    resources:
+      apps:
+        integrations_mcp:
+          name: ${var.mcp_app_name}
+          description: "Mock MuleSoft + GCP integration status and job error text, as MCP tools for Genie One"
+          source_code_path: ../mcp_mock
+          config:
+            command: ["python", "server.py"]
+            env:
+              - {name: DATABRICKS_WAREHOUSE_ID, value: "${var.warehouse_id}"}
+              - {name: DEMO_FLAGS_TABLE, value: "${var.demo_flags_table}"}
+          resources:
+            - name: sql-warehouse
+              sql_warehouse: {id: "${var.warehouse_id}", permission: CAN_USE}

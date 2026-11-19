@@ -1,0 +1,68 @@
+resources:
+  jobs:
+    job_ops_setup:
+      name: "[Job Ops] setup — data layer, Genie Agent, domain, skills"
+      description: >-
+        Creates everything Genie One needs to answer job-health questions. Idempotent; re-run after
+        changing SQL, skills or instructions. Runs on serverless.
+      tasks:
+        - task_key: data_layer
+          notebook_task:
+            notebook_path: ../src/notebooks/setup_objects.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              ops_group: ${var.ops_group}
+              zeroops_url: ${var.zeroops_url}
+              bundle_root: ${workspace.file_path}
+              schema_only_scope: ${var.schema_only_scope}
+        - task_key: genie_agent
+          depends_on: [{task_key: data_layer}]
+          notebook_task:
+            notebook_path: ../src/notebooks/deploy_genie_agent.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              warehouse_id: ${var.warehouse_id}
+              ops_group: ${var.ops_group}
+              company_name: ${var.company_name}
+        - task_key: domain
+          depends_on: [{task_key: genie_agent}]
+          notebook_task:
+            notebook_path: ../src/notebooks/create_domain.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              domain_tag_key: ${var.domain_tag_key}
+              ops_app_name: ${var.ops_app_name}
+              space_id: "{{tasks.genie_agent.values.space_id}}"
+              schema_only_scope: ${var.schema_only_scope}
+        - task_key: uc_skills
+          depends_on: [{task_key: data_layer}]
+          notebook_task:
+            notebook_path: ../src/notebooks/publish_uc_skills.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              ops_group: ${var.ops_group}
+              bundle_root: ${workspace.file_path}
+        - task_key: workspace_instructions
+          depends_on: [{task_key: data_layer}]
+          notebook_task:
+            notebook_path: ../src/notebooks/write_workspace_instructions.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              bundle_root: ${workspace.file_path}
+              schema_only_scope: ${var.schema_only_scope}
+        - task_key: tracing
+          depends_on: [{task_key: data_layer}]
+          notebook_task:
+            notebook_path: ../src/notebooks/link_trace_tables.py
+            base_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              warehouse_id: ${var.warehouse_id}
+              experiment_id: ${resources.experiments.job_ops_traces.id}
+              app_service_principal: ${resources.apps.job_ops_app.service_principal_client_id}
+              schema_only_scope: ${var.schema_only_scope}

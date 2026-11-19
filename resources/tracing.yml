@@ -1,0 +1,6 @@
+# MLflow experiment for the Job Ops app's traces (one per Genie turn). The setup job's `tracing` task links it to
+# Unity Catalog tables <catalog>.<schema>.job_ops_traces_otel_* (Apps can't reach the experiment's default storage).
+resources:
+  experiments:
+    job_ops_traces:
+      name: /Workspace/Users/${workspace.current_user.userName}/${var.ops_app_name}-traces

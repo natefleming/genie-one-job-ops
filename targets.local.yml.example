@@ -1,0 +1,15 @@
+# Copy to targets.local.yml (gitignored) and fill in the customer workspace. Deploy with -t <target> -p <profile>.
+# A schema-scoped customer deploy: no mock MCP app, no MCP registration (target-scoped in their resource files),
+# and nothing written outside the one schema we own.
+targets:
+  customer:
+    workspace:
+      host: https://<workspace>.azuredatabricks.net
+    variables:
+      company_name: <Company>
+      catalog: <catalog>
+      schema: <schema>
+      warehouse_id: <warehouse-id>
+      ops_group: <ops-group>
+      refresh_schedule: PAUSED
+      schema_only_scope: "true"

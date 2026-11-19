@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/databricks/cli/main/bundle/schema/jsonschema.json
+# Demo workloads for the Job Ops POC — TEST WORKSPACES ONLY (never deploy to the customer's production).
+# Retail-flavored jobs and a pipeline that fail on purpose, driven by flags in a control table,
+# so Genie One has realistic failures, nested-task failures, lineage and a stale table to talk about.
+#   ./scripts/deploy.sh fevm retail_consumer_goods --with-demo   (from the project root)
+bundle:
+  name: job-ops-demo
+  engine: direct
+
+include:
+  - resources/*.yml
+  - "*.local.yml"
+
+variables:
+  catalog:
+    description: Catalog for the demo data.
+    default: retail_consumer_goods
+  schema:
+    description: Schema for the demo data (the engagement schema by default).
+    default: job_ops
+  job_prefix:
+    description: Prefix of the demo job names, so you can ask Genie about "the <prefix> jobs" on a shared workspace.
+    default: Acme
+  schedule_pause:
+    description: UNPAUSED to run the demo schedules (needed for the stale-table scenario).
+    default: UNPAUSED
+
+targets:
+  default:
+    default: true
